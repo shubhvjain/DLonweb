@@ -1,0 +1,39 @@
+{
+  "name": "dlonwebjs",
+  "version": "0.0.1",
+  "description": "A library to train and use Deep Learning models for image segmentation, object detection for various types of input data",
+  "main": "./dist/dl-on-web.umd.js",
+  "module": "./dist/dl-on-web.es.js",
+  "exports": {
+    "import": "./dist/dl-on-web.es.js",
+    "require": "./dist/dl-on-web.umd.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "tensorflow",
+    "tfjs",
+    "image-processing",
+    "video-processing",
+    "segmentation",
+    "ml",
+    "browser",
+    "preprocessing"
+  ],
+  "author": "SVJ",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0"
+  }
+}

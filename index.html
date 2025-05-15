@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>DLOnWeb Test</title>
+  </head>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>  
+  
+
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; display: block; margin-top: 20px; }
+    img { display: none; }
+  </style>
+
+  <body>
+
+
+    <h1>General Classification (Object Detection) with COCO-SSD</h1>
+
+    <input type="file" id="imageInput" accept="image/*" />
+    <canvas id="canvas"></canvas>
+    <img id="hiddenImage" />
+  
+    <script>
+      let model;
+  
+      async function loadModel() {
+        console.log('Loading COCO-SSD model...');
+        model = await cocoSsd.load();
+        console.log('Model loaded.');
+      }
+  
+      async function runDetection(imgElement) {
+        const predictions = await model.detect(imgElement);
+        console.log('Predictions:', predictions);
+        drawPredictions(imgElement, predictions);
+      }
+  
+      function drawPredictions(image, predictions) {
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+  
+        // Set canvas size to match image
+        canvas.width = image.width;
+        canvas.height = image.height;
+  
+        // Draw image first
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+  
+        // Style for boxes
+        ctx.lineWidth = 2;
+        ctx.font = '16px Arial';
+        ctx.strokeStyle = 'red';
+        ctx.fillStyle = 'red';
+  
+        // Draw predictions
+        predictions.forEach(pred => {
+          const [x, y, width, height] = pred.bbox;
+          ctx.strokeRect(x, y, width, height);
+          ctx.fillText(`${pred.class} (${(pred.score * 100).toFixed(1)}%)`, x, y > 10 ? y - 5 : y + 15);
+        });
+      }
+  
+      window.onload = async () => {
+        await loadModel();
+  
+        const input = document.getElementById('imageInput');
+        const img = document.getElementById('hiddenImage');
+  
+        input.addEventListener('change', (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+  
+          const reader = new FileReader();
+          reader.onload = () => {
+            img.src = reader.result;
+            img.onload = () => {
+              runDetection(img);
+            };
+          };
+          reader.readAsDataURL(file);
+        });
+      };
+    </script>
+    
+
+
+========
+    <h1>Image/Video Classifier</h1>
+
+    <input type="file" id="fileInput" accept="image/*,video/*" />
+    <label for="fpsInput">FPS (video only):</label>
+    <input type="number" id="fpsInput" value="1" min="1" />
+    <button id="runBtn">Run Classification</button>
+  
+    <pre id="log"></pre>
+
+    
+    <script type="module">
+       import { ImageFile, VideoFile, ClassifyImage } from  "./src/index.js";
+
+const fileInput = document.getElementById('fileInput');
+const fpsInput = document.getElementById('fpsInput');
+const runBtn = document.getElementById('runBtn');
+const log = document.getElementById('log');
+
+let selectedFile = null;
+
+fileInput.addEventListener('change', (e) => {
+  selectedFile = e.target.files[0];
+  log.textContent = `Selected: ${selectedFile.name}`;
+});
+
+runBtn.addEventListener('click', async () => {
+  if (!selectedFile) {
+    alert('Please select an image or video.');
+    return;
+  }
+
+  const model = await tf.loadGraphModel('https://tfhub.dev/google/imagenet/mobilenet_v2_100_224/classification/5/default/1', { fromTFHub: true });
+  const labels = await fetch('https://storage.googleapis.com/download.tensorflow.org/data/ImageNetLabels.txt')
+    .then(res => res.text())
+    .then(txt => txt.trim().split('\n'));
+
+  const classifier = new ClassifyImage(null, { model, labels });
+
+  if (selectedFile.type.startsWith('image/')) {
+    const image = await ImageFile.fromFile(selectedFile);
+    classifier.imageFile = image;
+    const result = await classifier.run();
+    log.textContent = JSON.stringify(result.topPredictions(5), null, 2);
+  } else if (selectedFile.type.startsWith('video/')) {
+    const fps = parseInt(fpsInput.value, 10);
+    const video = await VideoFile.fromFile(selectedFile, fps);
+
+    const results = await video.runOnEach(async (imgFile) => {
+      const c = new ClassifyImage(imgFile, { model, labels });
+      return await c.run();
+    });
+
+    log.textContent = results.map((r, i) =>
+      `Frame ${i}: ${r.bestPrediction()?.label || 'N/A'} (${r.bestPrediction()?.score?.toFixed(2) || '0'})`
+    ).join('\n');
+  } else {
+    alert('Unsupported file type.');
+  }
+});
+    </script>
+
+
+
+
+
+    <h1>Test Image Processing</h1>
+    <input type="file" id="fileInput" accept="image/*" multiple />
+    <div id="preview"></div>
+
+    <!-- <script type="module">
+      import {  ImageFile,VideoFile} from "./src/index.js";
+      const input = document.querySelector("#fileInput");
+      input.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        const image = await ImageFile.fromFile(file);
+
+        const tensor = await image.toTensor({
+          targetWidth: 224,
+          targetHeight: 224,
+          normalize: true,
+        });
+
+        console.log("Tensor shape:", tensor.shape); // [1, 224, 224, 3]
+        console.log("Image size:", image.image_width, image.image_height);
+        
+        const htmlImage = await image._getHTMLImage();
+        document.getElementById('preview').appendChild(htmlImage);
+
+      });
+    </script> -->
+  </body>
+</html>
