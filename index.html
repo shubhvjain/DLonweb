@@ -5,101 +5,44 @@
     <title>DLOnWeb Test</title>
   </head>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>  
-  
-
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    canvas { border: 1px solid #ccc; display: block; margin-top: 20px; }
-    img { display: none; }
-  </style>
-
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT"
+    crossorigin="anonymous"
+  />
   <body>
+    <div class="container">
+      <div class="card m-1">
+        <div class="card-body">
+          <h2>card 1 :Object Detection with COCO-SSD</h2>
+          Select an image :
+          <input type="file" id="imageInput" accept="image/*" />
+          <img id="hiddenImage" />
+          <br>
 
+          Classified image : 
+          <br>
+          <img id="preview" />
+        </div>
+      </div>
 
-    <h1>General Classification (Object Detection) with COCO-SSD</h1>
+      <div class="card">
+        <div class="card-body">
+          <h2>card 2 : Test Input Loader</h2>
+          <input type="file" id="fileInput" />
+          <label
+            >FPS (for video): <input type="number" id="fpsInput" value="1"
+          /></label>
+          <button id="loadBtn">Load File</button>
 
-    <input type="file" id="imageInput" accept="image/*" />
-    <canvas id="canvas"></canvas>
-    <img id="hiddenImage" />
-  
-    <script>
-      let model;
-  
-      async function loadModel() {
-        console.log('Loading COCO-SSD model...');
-        model = await cocoSsd.load();
-        console.log('Model loaded.');
-      }
-  
-      async function runDetection(imgElement) {
-        const predictions = await model.detect(imgElement);
-        console.log('Predictions:', predictions);
-        drawPredictions(imgElement, predictions);
-      }
-  
-      function drawPredictions(image, predictions) {
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-  
-        // Set canvas size to match image
-        canvas.width = image.width;
-        canvas.height = image.height;
-  
-        // Draw image first
-        ctx.drawImage(image, 0, 0, image.width, image.height);
-  
-        // Style for boxes
-        ctx.lineWidth = 2;
-        ctx.font = '16px Arial';
-        ctx.strokeStyle = 'red';
-        ctx.fillStyle = 'red';
-  
-        // Draw predictions
-        predictions.forEach(pred => {
-          const [x, y, width, height] = pred.bbox;
-          ctx.strokeRect(x, y, width, height);
-          ctx.fillText(`${pred.class} (${(pred.score * 100).toFixed(1)}%)`, x, y > 10 ? y - 5 : y + 15);
-        });
-      }
-  
-      window.onload = async () => {
-        await loadModel();
-  
-        const input = document.getElementById('imageInput');
-        const img = document.getElementById('hiddenImage');
-  
-        input.addEventListener('change', (event) => {
-          const file = event.target.files[0];
-          if (!file) return;
-  
-          const reader = new FileReader();
-          reader.onload = () => {
-            img.src = reader.result;
-            img.onload = () => {
-              runDetection(img);
-            };
-          };
-          reader.readAsDataURL(file);
-        });
-      };
-    </script>
-    
-
-
-========
-    <h1>Image/Video Classifier</h1>
-
-    <input type="file" id="fileInput" accept="image/*,video/*" />
-    <label for="fpsInput">FPS (video only):</label>
-    <input type="number" id="fpsInput" value="1" min="1" />
-    <button id="runBtn">Run Classification</button>
-  
-    <pre id="log"></pre>
-
-    
-    <script type="module">
-       import { ImageFile, VideoFile, ClassifyImage } from  "./src/index.js";
+          <div id="preview11"></div>
+        </div>
+      </div>
+    </div>
+    <!-- <script type="module">
+       import { ImageFile, VideoFile } from  "./src/index.js";
 
 const fileInput = document.getElementById('fileInput');
 const fpsInput = document.getElementById('fpsInput');
@@ -147,36 +90,151 @@ runBtn.addEventListener('click', async () => {
     alert('Unsupported file type.');
   }
 });
-    </script>
+    </script> -->
+
+    <script type="module">
+      import {
+        load_input,
+        InferenceTask,
+        ImageFile,
+        VideoFile,
+      } from "./src/index.js";
+
+      // card 2
+      const fileInput = document.getElementById("fileInput");
+      const fpsInput = document.getElementById("fpsInput");
+      const loadBtn = document.getElementById("loadBtn");
+      const preview = document.getElementById("preview11");
+      loadBtn.addEventListener("click", async () => {
+        const file = fileInput.files[0];
+        const fps = parseInt(fpsInput.value);
+
+        if (!file) {
+          alert("Please select a file");
+          return;
+        }
+
+        preview.innerHTML = "Loading...";
+        try {
+          const input = await load_input(file, { fps });
+          console.log("Loaded input:", input);
+
+          preview.innerHTML = "";
+
+          if (input instanceof ImageFile) {
+            const img = document.createElement("img");
+            img.src = input.toObjectURL();
+            preview.appendChild(img);
+          } else if (input instanceof VideoFile) {
+            console.log(input);
+            input.frames.forEach((frame) => {
+              const img = document.createElement("img");
+              img.src = frame.toObjectURL();
+              preview.appendChild(img);
+            });
+          }
+          //  else if (input instanceof ImageStackFile) {
+          //   input.frames.forEach(frame => {
+          //     const img = document.createElement('img');
+          //     img.src = frame.toObjectURL();
+          //     preview.appendChild(img);
+          //   });
+          // }
+          else {
+            preview.innerText = "Unknown input type.";
+          }
+        } catch (err) {
+          console.error(err);
+          preview.innerText = "Failed to load file: " + err.message;
+        }
+      });
+
+      // card 1
+
+      let model;
+
+      async function loadModel() {
+        console.log("Loading COCO-SSD model...");
+        model = await cocoSsd.load();
+        console.log("Model loaded.");
+      }
+
+      async function runDetection(file, imgElement) {
+        
+        // await loadModel();
+
+        // Optional: you can use `input` from load_input if needed for other tasks
+        const input = await load_input(file);
+        console.log( input);
 
 
+        let infer = new InferenceTask("classify",input)
+        let result =  await infer.run()
 
+        console.log(infer)
 
+        console.log(result)
 
-    <h1>Test Image Processing</h1>
-    <input type="file" id="fileInput" accept="image/*" multiple />
-    <div id="preview"></div>
+        //const predictions = await model.detect(imgElement); // direct use with coco-ssd
+        await result.embedPredictionsIntoImage()
+        console.log("Predictions:", result);
+        const imgElement1 = document.getElementById('preview');
+        imgElement1.src = result.toObjectURL();
+        //drawPredictions(imgElement, predictions);
+      }
 
-    <!-- <script type="module">
-      import {  ImageFile,VideoFile} from "./src/index.js";
-      const input = document.querySelector("#fileInput");
-      input.addEventListener("change", async (e) => {
-        const file = e.target.files[0];
-        const image = await ImageFile.fromFile(file);
+      function drawPredictions(image, predictions) {
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
 
-        const tensor = await image.toTensor({
-          targetWidth: 224,
-          targetHeight: 224,
-          normalize: true,
+        // Set canvas size to match image
+        canvas.width = image.width;
+        canvas.height = image.height;
+
+        // Draw image first
+        ctx.drawImage(image, 0, 0, image.width, image.height);
+
+        // Style for boxes
+        ctx.lineWidth = 2;
+        ctx.font = "16px Arial";
+        ctx.strokeStyle = "red";
+        ctx.fillStyle = "red";
+
+        // Draw predictions
+        predictions.forEach((pred) => {
+          const [x, y, width, height] = pred.bbox;
+          ctx.strokeRect(x, y, width, height);
+          ctx.fillText(
+            `${pred.class} (${(pred.score * 100).toFixed(1)}%)`,
+            x,
+            y > 10 ? y - 5 : y + 15
+          );
+        });
+      }
+
+      window.onload = async () => {
+        // image classification testing
+        //await loadModel();
+        const input = document.getElementById("imageInput");
+        const img = document.getElementById("hiddenImage");
+
+        input.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            img.src = reader.result;
+            img.onload = () => {
+              console.log("on loading ....running classification");
+              runDetection(file, img); // 👈 pass both
+            };
+          };
+          reader.readAsDataURL(file);
         });
 
-        console.log("Tensor shape:", tensor.shape); // [1, 224, 224, 3]
-        console.log("Image size:", image.image_width, image.image_height);
-        
-        const htmlImage = await image._getHTMLImage();
-        document.getElementById('preview').appendChild(htmlImage);
-
-      });
-    </script> -->
+        //
+      };
+    </script>
   </body>
 </html>

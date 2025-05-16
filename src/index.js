@@ -1,2 +1,2 @@
 export * from './data.js';
-export * from './model.js'
+export * from './inference_task.js'

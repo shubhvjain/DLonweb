@@ -5,7 +5,36 @@
  * At this time we are only dealing with image data. This includes single image, image stack and videos. All of these requires separate processing 
  * 
  */
-import * as tf from '@tensorflow/tfjs';
+
+// this is the main method to read the file and get the appropriate instance of file object (Image,Video or Image stack )
+export const load_input = async (file, options = {}) => {
+  if(!file){
+    throw new Error("No file provided ")
+  }
+  const extension = file.name.split('.').pop().toLowerCase();
+  const type = file.type || "";
+
+  if (type.startsWith('image/') && !['tiff', 'tif'].includes(extension)) {
+    // Simple image file
+    const file_raw = await file.arrayBuffer();
+    return await ImageFile.fromFile(file);
+
+  } else if (type.startsWith('video/')) {
+    // Video file – extract frames
+    const fps = options.fps ?? 1;
+    return await VideoFile.fromFile(file, fps);
+
+  } else if (['tiff', 'tif'].includes(extension)) {
+    // Multi-page TIFF stack
+    return await ImageStackFile.fromFile(file); // Assumes such a method exists
+
+  } else {
+    throw new Error(`Unsupported input file type: ${file.name}`);
+  }
+};
+
+
+// import * as tf from '@tensorflow/tfjs';
 
 // export const process_input = async (files,options={result:'raw_image'})=>{
 //   if (!files || files.length === 0) {
@@ -271,8 +300,55 @@ export class ImageFile {
   bestPrediction() {
     return this.predictions?.[0] || null;
   }
-}
 
+
+    /**
+   * Embed bounding boxes directly into the image.
+   * This will update the file/file_raw to the new modified image.
+   */
+    async embedPredictionsIntoImage() {
+      const image = await this._loadHTMLImage();
+      
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext("2d");
+  
+      // Draw original image
+      ctx.drawImage(image, 0, 0, image.width, image.height);
+  
+      // Draw bounding boxes if available
+      if (this.predictions && this.predictions.length > 0) {
+        ctx.lineWidth = 2;
+        ctx.font = "16px Arial";
+        ctx.strokeStyle = "red";
+        ctx.fillStyle = "red";
+  
+        this.predictions.forEach(pred => {
+          if (!pred.bbox) return;
+          const [x, y, width, height] = pred.bbox;
+          ctx.strokeRect(x, y, width, height);
+          ctx.fillText(
+            `${pred.class} (${(pred.score * 100).toFixed(1)}%)`,
+            x,
+            y > 10 ? y - 5 : y + 15
+          );
+        });
+      }
+  
+      // Convert canvas to Blob and ArrayBuffer
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, this.file_type));
+      const arrayBuffer = await blob.arrayBuffer();
+  
+      // Replace internal image data
+      const newFile = new File([blob], this.file_name, { type: this.file_type });
+      this.file = newFile;
+      this.file_raw = arrayBuffer;
+  
+      // Invalidate blobURL
+      this._blobURL = null;
+    }
+}
 
 export class VideoFile {
   /**
@@ -358,3 +434,4 @@ function seekVideo(video, time) {
     video.currentTime = time;
   });
 }
+
